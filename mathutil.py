@@ -3,21 +3,18 @@ from typing import Set
 import math
 
 
-def euclid_dist(a: Point, b: Point):
-    dy = b.y - a.y
-    dx = b.x - a.x
-    return math.sqrt(dy*dy + dx*dx)
-
-
 class Vector:
     def __init__(self, x: int, y: int):
         self.x = x
         self.y = y
 
-    def reflect_by_line(self, l):
-        alfa = math.atan(l.slope)
+    def reflect_by_line(self, l: Line):
+        if l.is_vertical():
+            self.x *= -1
+            return
+        alfa, _ = l.to_slope_intercept()
+        #alfa = math.atan(s)
         beta = math.atan2(self.y, self.x)
-        print(alfa, beta)
         self.rotate(2*alfa - 2*beta)
 
     def rotate(self, theta: float):
@@ -45,7 +42,7 @@ class Point:
         self.y = y
 
     def to_tuple(self):
-        return (self.x, self.y)
+        return (int(self.x), int(self.y))
 
     def isclose(self, p: Point, *args, **kwargs):
         d = euclid_dist(self, p)
@@ -58,7 +55,7 @@ class Point:
         return Point(self.x + v.x, self.y + v.y)
 
     def __repr__(self):
-        return '<Point x={} y={}>'.format(self.x, self.y)
+        return '<Point x={0:.3f} y={1:.3f}>'.format(self.x, self.y)
 
 
 class Line:
@@ -93,12 +90,21 @@ class Line:
         if l.is_vertical(): return self.is_vertical()
         return self.a / l.a == self.b / l.b
 
+    def get_x(self):
+        return -self.c / self.a
+
+    def get_y(self):
+        return -self.c / self.b
+
     def eval_at(self, x=None, y=None):
-        if x is not None and not self.is_vertical():
+        if x is not None:
+            if self.is_vertical() and x == self.get_x():
+                raise Exception('Infinitely many solutions')
             return Point(x=x, y=(-self.c - self.a*x) / self.b)
-        if y is not None and not self.is_horizontal():
-            return Point(x=x, y=(-self.c - self.b*y) / self.a)
-        raise Exception()
+        if y is not None:
+            if self.is_horizontal() and y == self.get_y():
+                raise Exception('Infinitely many solutions')
+            return Point(x=(-self.c - self.b*y) / self.a, y=y)
 
     def to_slope_intercept(self):
         return -self.a/self.b, -self.c/self.b
@@ -113,9 +119,16 @@ class Line:
 
     def __and__(self, obj):
         if self is obj:
+            print('is')
             return self
         if isinstance(obj, Segment):
-            return (self & obj.get_direction()) in obj
+            p = self & obj.get_direction()
+            if p in obj:
+                print(p, self)
+                return {p}
+            else:
+                print('out')
+                return set()
         if isinstance(obj, Line):
             #  if self.b*obj.a - self.a*obj.b == 0:
             if self.is_parallel(obj):
@@ -127,9 +140,9 @@ class Line:
             return self.eval_at(y=(self.a*obj.c - self.c*obj.a) / (self.b*obj.a - self.a*obj.b))
 
     def __contains__(self, p: Point):
-        if self.is_horizontal(): return p.y == -self.c / self.b
-        if self.is_vertical(): return p.x == -self.c / self.a
-        return self.eval_at(x=p.x) == p.y
+        if self.is_vertical():
+            return p.x == -self.c / self.a
+        return self.eval_at(x=p.x).y == p.y
 
     def __repr__(self):
         return '<Line: a={} b={} c={}'.format(self.a, self.b, self.c)
@@ -156,7 +169,6 @@ class Line2:
         return Line(slope, y_intercept)
 
 
-
 class Segment:
     def __init__(self, a: Point, b: Point):
         self.a = a
@@ -176,8 +188,12 @@ class Segment:
         return Line.from_two_points(self.a, self.b)
 
     def __contains__(self, p: Point):
+        if self.a.x == p.x == self.b.x:
+            return self.a.y <= p.y <= self.b.y or self.a.y >= p.y >= self.b.y
+
         if p in self.get_direction():
             return self.a.x <= p.x <= self.b.x or self.a.x >= p.x >= self.b.x
+
 
 class Rect:
     def __init__(self, init_pos: Point, width: int, height: int):
@@ -225,7 +241,33 @@ class Circle:
         return euclid_dist(self.pos, p) <= self.r
 
     def __repr__(self):
-        return 'circle: pos: {}, r='.format(self.pos, self.r)
+        return 'circle: pos: {}, r={}'.format(self.pos, self.r)
+
+    def __and__(self, l: Line):
+        if l.is_vertical():
+            if abs(l.get_x() - self.pos.x) <= self.r:
+                m = math.sqrt(self.r**2 - (l.get_x() - self.pos.x)**2)
+                return {Point(l.get_x(), self.pos.y - m), Point(l.get_x(), self.pos.y + m)}
+            return set()
+
+        a, b = l.to_slope_intercept()
+        xs = solve_quadratic(
+            1+a**2,
+            -2*self.pos.x + 2*a*b - 2*a*self.pos.y,
+            self.pos.x**2 + b**2 - 2*b*self.pos.y + self.pos.y**2 - self.r**2
+        )
+        return {l.eval_at(x) for x in xs}
+
+
+def solve_quadratic(a, b, c):
+    d = b*b - 4*a*c
+    if d < 0:
+        return set()
+    if d == 0:
+        return {-b/2/a}
+    else:
+        return {(-b - math.sqrt(d))/2/a, (-b + math.sqrt(d))/2/a}
+
 
 def overlap(ball_body, rect):
     pos = ball_body.pos
@@ -237,9 +279,9 @@ def overlap(ball_body, rect):
 
 
 def intersect(seg: Segment, circle: Circle):
-    line = Line.from_two_points(seg.a, seg.b)
-    norm = line.get_perpendicular(circle.pos)
-    return bool(norm & seg)
+    inter = circle & seg.get_direction()
+    inter = {p for p in inter if p in seg}
+    return len(inter) > 0
 
 
 def line_point_distance(l: Line, p: Point):
@@ -289,3 +331,9 @@ def reflect(vect, line):
 
     vx2 = vx * (cos2a - sin2a * tana)
     vy2 = vy * (sin2a * cota - cos2a)
+
+
+def euclid_dist(a: Point, b: Point):
+    dy = b.y - a.y
+    dx = b.x - a.x
+    return math.sqrt(dy*dy + dx*dx)

@@ -24,7 +24,7 @@ ball = GameObject(
     body = Circle(
         init_pos=Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2),
         r=25),
-    init_v = Vector(3, 0))
+    init_v = Vector(8, 0))
 
 left_pad = GameObject(
     body = Rect(
@@ -51,22 +51,22 @@ while not game_ended:
             game_ended = True
     mouse_x, mouse_y = pygame.mouse.get_pos()
 
+    # update game objects' positions
+    left_pad.body.pos.y = mouse_y
+    right_pad.body.pos.y = mouse_y
+    ball.body.pos += ball.v
+
     # redraw the screen content
     screen.fill(BLACK)
     pygame.draw.rect(screen, RED, left_pad.body.get_pygame_rect())
     pygame.draw.rect(screen, RED, right_pad.body.get_pygame_rect())
-    pygame.draw.circle(screen, BLUE, ball.body.pos.to_tuple(), ball.body.r)
+    pygame.draw.circle(screen, BLUE, ball.body.pos.to_tuple(), int(ball.body.r))
     pygame.display.flip()
 
-    # update game objects' positions
-    left_pad.body.pos.y = SCREEN_HEIGHT - mouse_y
-    right_pad.body.pos.y = mouse_y
-    ball.body.pos += ball.v
-
     # which side of the board is the ball on?
-    half = ball.body.pos.x // (SCREEN_WIDTH // 2)
+    half = int(ball.body.pos.x) // (SCREEN_WIDTH // 2)
 
-    # Detect colision
+    # Detect collision
     pad = [left_pad, right_pad][half]
 
     if overlap(ball.body, pad.body):
