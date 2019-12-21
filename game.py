@@ -1,7 +1,7 @@
 import pygame
 
 from gameobjects import GameObject
-from mathutil import Point, Vector, Circle, Rect, overlap, reflect_by_rect
+from mathutil import Point, Vector, Circle, Line, Rect, overlap, Segment
 from colors import *
 
 FPS = 60
@@ -16,32 +16,32 @@ SCREEN_HEIGHT = 480
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("ping-pong")
 
-PAD_ALIGN = 0.2 * SCREEN_WIDTH
+PAD_ALIGN = SCREEN_WIDTH // 5
 PAD_WIDTH = 25
 PAD_HEIGHT = 150
 
 ball = GameObject(
-    body = Circle(
+    body=Circle(
         init_pos=Point(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2),
         r=25),
-    init_v = Vector(8, 0))
+    init_v=Vector(8, 0))
 
 left_pad = GameObject(
-    body = Rect(
+    body=Rect(
         init_pos=Point(PAD_ALIGN, 0),
         width=PAD_WIDTH,
         height=PAD_HEIGHT),
-    init_v = Vector(0, 0))
+    init_v=Vector(0, 0))
 
 right_pad = GameObject(
-    body = Rect(
+    body=Rect(
         Point(SCREEN_WIDTH - PAD_ALIGN, SCREEN_HEIGHT),
         width=PAD_WIDTH,
         height=PAD_HEIGHT),
-    init_v = Vector(0, 0))
+    init_v=Vector(0, 0))
 
 game_ended = False
-
+last_hit = pygame.time.get_ticks()
 while not game_ended:
     # collect the input
     for event in pygame.event.get():
@@ -63,14 +63,29 @@ while not game_ended:
     pygame.draw.circle(screen, BLUE, ball.body.pos.to_tuple(), int(ball.body.r))
     pygame.display.flip()
 
+    # hasn't the ball missed the pad?
+    in_x = 0 <= ball.body.pos.x < SCREEN_WIDTH
+    in_y = 0 <= ball.body.pos.y < SCREEN_HEIGHT
+    if not (in_x and in_y):
+        print('Game over!')
+        break
+
     # which side of the board is the ball on?
     half = int(ball.body.pos.x) // (SCREEN_WIDTH // 2)
-
-    # Detect collision
     pad = [left_pad, right_pad][half]
 
-    if overlap(ball.body, pad.body):
-        reflect_by_rect(ball, pad)
+    # Detect collision
+    if pygame.time.get_ticks() - last_hit >= 100:
+        overlapping = overlap(ball.body, pad.body)
+        if overlapping is not None:
+            last_hit = pygame.time.get_ticks()
+        if isinstance(overlapping, Segment):
+            ball.v.reflect_by_line(overlapping.get_direction())
+        elif isinstance(overlapping, Point):
+            radius = Line.from_two_points(ball.body.pos, overlapping)
+            ball.v.reflect_by_line(radius.get_perpendicular(overlapping))
+        elif overlapping is True:
+            ball.v = -ball.v
 
     clock.tick(FPS)
 
