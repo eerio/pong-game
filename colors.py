@@ -1,4 +1,5 @@
-# not PEP-8 compliant, but imo way cleaner this way
+#!/usr/bin/env python3
+
 BLACK   = 0,    0,      0
 WHITE   = 255,  255,    255
 BLUE    = 50,   50,     255
