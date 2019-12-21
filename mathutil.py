@@ -12,8 +12,12 @@ class Vector:
         if l.is_vertical():
             self.x *= -1
             return
+        elif l.is_horizontal():
+            self.y *= -1
+            return
+        print('non triv')
         alfa, _ = l.to_slope_intercept()
-        #alfa = math.atan(s)
+        alfa = math.atan(alfa)
         beta = math.atan2(self.y, self.x)
         self.rotate(2*alfa - 2*beta)
 
@@ -72,7 +76,7 @@ class Line:
         elif self.b == 0:
             return Line(0, 1, -p.y)
 
-    def y_where(x0: float):
+    def y_where(self, x0: float):
         if self.b == 0:
             raise Exception('Cannot get y value of a vertical line')
         return -self.a/self.b*x0 + -self.c/self.b
@@ -273,15 +277,20 @@ def overlap(ball_body, rect):
     pos = ball_body.pos
     if pos in rect:
         return True
-    if any(intersect(side, ball_body) for side in rect.sides()):
-        return True
-    return False
+    for vert in rect.get_vertices():
+        if vert in ball_body:
+            return vert            
+    for side in rect.sides():
+        inters = intersect(side, ball_body)
+        if inters:
+            return side
+    return None
 
 
 def intersect(seg: Segment, circle: Circle):
     inter = circle & seg.get_direction()
     inter = {p for p in inter if p in seg}
-    return len(inter) > 0
+    return inter
 
 
 def line_point_distance(l: Line, p: Point):
@@ -315,9 +324,10 @@ def reflect_by_rect(ball, rect):
             line = Line.from_two_points(ball.body.pos, vert)
             line = line.get_perpendicular(vert)
             ball.v.reflect_by_line(line)
-            return line.get_perpendicular(vert)
+            return
+            # return line.get_perpendicular(vert)
     else:
-        ball.v = -ball.v
+        ball.v = 0
 
 
 def reflect(vect, line):
